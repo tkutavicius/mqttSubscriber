@@ -10,8 +10,7 @@ enabled_sub = s:option(Flag, "enabled", translate("Enable"), translate("Select t
 
 remote_addr = s:option(Value, "remote_addr", translate("Hostname"), translate("Specify address of the broker"))
 remote_addr:depends("enabled", "1")
-remote_addr.placeholder  = "www.example.com"
-remote_addr.default = "localhost"
+remote_addr.placeholder  = "localhost"
 remote_addr.datatype = "host"
 remote_addr.parse = function(self, section, novld, ...)
 	local enabled = luci.http.formvalue("cbid.mqtt_sub.mqtt_sub.enabled")
@@ -24,7 +23,6 @@ end
 
 remote_port = s:option(Value, "remote_port", translate("Port"), translate("Specify port of the broker"))
 remote_port:depends("enabled", "1")
-remote_port.default = "1883"
 remote_port.placeholder = "1883"
 remote_port.datatype = "port"
 remote_port.parse = function(self, section, novld, ...)
@@ -32,20 +30,6 @@ remote_port.parse = function(self, section, novld, ...)
 	local value = self:formvalue(section)
 	if enabled and (value == nil or value == "") then
 		self:add_error(section, "invalid", "Error: port is empty")
-	end
-	Value.parse(self, section, novld, ...)
-end
-
-topic = s:option(Value, "topic", translate("Message topic"), translate("Specify topic of the message"))
-topic:depends("enabled", "1")
-topic.default = "TeltonikaRUTX10"
-topic.placeholder = "mytopic"
-topic.datatype = "string"
-topic.parse = function(self, section, novld, ...)
-	local enabled = luci.http.formvalue("cbid.mqtt_sub.mqtt_sub.enabled")
-	local value = self:formvalue(section)
-	if enabled and (value == nil or value == "") then
-		self:add_error(section, "invalid", "Error: topic is empty")
 	end
 	Value.parse(self, section, novld, ...)
 end
@@ -179,7 +163,8 @@ o.datatype = "uciname"
 o.placeholder = "Identity"
 o:depends({tls = "1", tls_type = "psk"})
 
-s1 = m:section(TypedSection, "mqtt_topic", translate("MQTT Topics"))                                        
+m1 = Map("mqtt_topics")
+s1 = m1:section(TypedSection, "mqtt_topic", translate("MQTT Topics"))                                        
 s1.template  = "cbi/tblsection"                                                                           
 s1.addremove = true                                                                                       
 s1.anonymous = true   
@@ -226,7 +211,7 @@ if value and #value > 0 then
 	return stat                                               
 end 
 s1:option(DummyValue, "topicName", translate("Topic name"), translate("Name of MQTT Topic"))
-s1:option(DummyValue, "qos", translate("QoS"), translate("QoS of MQTT Topic"))            
+s1:option(DummyValue, "qos", translate("QoS"), translate("QoS of MQTT Topic"))          
 
 s2 = m:section(NamedSection, "mqtt_sub", "mqtt_sub",  translate("MQTT Messages"), translate(""))
 o = s2:option(TextValue, "script")
@@ -240,4 +225,4 @@ s3 = m:section(SimpleSection, "", translate(""))
 button = s3:option(DummyValue, "refresh")                     
 button.template = "/mqtt/refreshbutton" 
 
-return m
+return m,m1

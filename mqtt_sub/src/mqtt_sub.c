@@ -5,6 +5,21 @@
 #include <string.h>
 #include <stdlib.h>
 #include <time.h>
+#include <malloc.h>
+
+typedef struct topic
+{
+        char name[60];
+        int QoS;
+} topic;
+
+typedef struct broker
+{
+        char remote_addr[256];
+        char remote_port[6];
+        char userName[20];
+        char password[20];
+} broker;
 
 volatile sig_atomic_t deamonize = 1;
 
@@ -13,7 +28,20 @@ void term_proc(int sigterm)
         deamonize = 0;
 }
 
-void message_callback(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
+static void connect_cb(struct mosquitto *mosq, void *userdata, int rc)
+{
+        if (rc)
+        {
+                fprintf(stderr, "%s\n", mosquitto_connack_string(rc));
+        }
+}
+
+void subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos)
+{
+        fprintf(stdout, "Subscription successful! QoS: %d\n", granted_qos[0]);
+}
+
+static void message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
 {
         FILE *fp;
         time_t now;
@@ -37,111 +65,181 @@ void message_callback(struct mosquitto *mosq, void *userdata, const struct mosqu
         }
 }
 
-int uci_get_value(struct uci_option *o, char *option)
+struct uci_package *loadConfig(char *config_name)
 {
-        struct uci_element *e;
-        int rc = 0;
-        switch (o->type)
+        struct uci_context *ctx;
+        struct uci_package *pkg;
+        if ((ctx = uci_alloc_context()) == NULL)
         {
-        case UCI_TYPE_STRING:
-                strcpy(option, o->v.string);
-                rc = 0;
-                break;
-        default:
-                rc = 1;
-                break;
+                return NULL;
         }
-        return rc;
+        if (uci_load(ctx, config_name, &pkg) != UCI_OK)
+        {
+                return NULL;
+        }
+        return pkg;
 }
 
-int get_config_entry(char *path, char *option)
+int countOptions(struct uci_package *p)
+{
+        int c = 0;
+        struct uci_element *i;
+        uci_foreach_element(&p->sections, i)
+        {
+                c++;
+        }
+        return c;
+}
+
+int getTopics(char *config_name, struct topic **allTopics)
+{
+        struct uci_package *p = NULL;
+        struct uci_element *i, *j;
+        int c = 0;
+
+        if ((p = loadConfig(config_name)) == NULL)
+        {
+                return -1;
+        }
+
+        if ((*allTopics = malloc(sizeof(struct topic) * countOptions(p))) == NULL)
+        {
+                return -1;
+        }
+
+        uci_foreach_element(&p->sections, i)
+        {
+                struct uci_section *section = uci_to_section(i);
+                uci_foreach_element(&section->options, j)
+                {
+                        struct uci_option *option = uci_to_option(j);
+                        char *option_name = option->e.name;
+
+                        if (strcmp(option_name, "topicName") == 0)
+                        {
+                                strcpy((*allTopics)[c].name, option->v.string);
+                        }
+                        else if (strcmp(option_name, "qos") == 0)
+                        {
+                                (*allTopics)[c].QoS = (int)strtol(option->v.string, (char **)NULL, 10);
+                        }
+                }
+                c++;
+        }
+        return c;
+}
+
+int getOption(char *path, char *option)
 {
         struct uci_context *c = uci_alloc_context();
         struct uci_ptr ptr;
         int rc = 0;
         if (uci_lookup_ptr(c, &ptr, path, true) != UCI_OK || ptr.o == NULL)
         {
-                rc = 1;
+                rc = -1;
         }
         else
         {
-                if (uci_get_value(ptr.o, option) != 0)
-                {
-                        rc = 1;
-                }
+                strcpy(option, ptr.o->v.string);
         }
         uci_free_context(c);
         return rc;
 }
 
-struct mosquitto *connectToBroker()
+int getBroker(struct broker *mqttBroker)
 {
-        struct mosquitto *mosq = NULL;
-        char *entry = NULL;
-        char *remote_addr = NULL;
-        char *remote_port = NULL;
-        char *topic = NULL;
-        int cPort;
-        int rc = 0;
-        int keepalive = 60;
-        bool clean_session = true;
-        entry = malloc(sizeof(char) * 30);
-        remote_addr = malloc(sizeof(char) * 20);
-        remote_port = malloc(sizeof(char) * 6);
-        topic = malloc(sizeof(char) * 20);
+        char entry[30];
         strcpy(entry, "mqtt_sub.mqtt_sub.remote_addr");
-        if (get_config_entry(entry, remote_addr) != 0)
+        if (getOption(entry, mqttBroker->remote_addr) != 0)
         {
-                fprintf(stderr, "Cannot parse broker address!\n");
-                goto clean;
+                return -1;
         }
         strcpy(entry, "mqtt_sub.mqtt_sub.remote_port");
-        if (get_config_entry(entry, remote_port) != 0)
+        if (getOption(entry, mqttBroker->remote_port) != 0)
         {
-                fprintf(stderr, "Cannot parse broker port!\n");
-                goto clean;
+                return -1;
         }
-        strcpy(entry, "mqtt_sub.mqtt_sub.topic");
-        if (get_config_entry(entry, topic) != 0)
+        strcpy(entry, "mqtt_sub.mqtt_sub.username");
+        if (getOption(entry, mqttBroker->userName) != 0)
         {
-                fprintf(stderr, "Cannot parse topic!\n");
-                goto clean;
+                mqttBroker->userName[0] = 0;
         }
-
-        mosq = mosquitto_new(NULL, clean_session, NULL);
-        if (!mosq)
+        strcpy(entry, "mqtt_sub.mqtt_sub.password");
+        if (getOption(entry, mqttBroker->password) != 0)
         {
-                fprintf(stderr, "Out of memory!\n");
-                goto clean;
+                mqttBroker->password[0] = 0;
         }
-        else
+        return 0;
+}
+
+int topicsSubscription(struct mosquitto ***mosq, struct topic *allTopics)
+{
+        int tC = (malloc_usable_size(allTopics) / sizeof(topic));
+        for (int i = 0; i < tC; i++)
         {
-                cPort = (int)strtol(remote_port, (char **)NULL, 10);
-
-                mosquitto_message_callback_set(mosq, message_callback);
-
-                if (mosquitto_connect(mosq, remote_addr, cPort, keepalive))
+                if ((mosquitto_subscribe(**mosq, NULL, allTopics[i].name, allTopics[i].QoS)) != MOSQ_ERR_SUCCESS)
                 {
-                        fprintf(stderr, "Unable to connect to broker!\n");
-                        mosq = NULL;
-                        goto clean;
-                }
-
-                if (mosquitto_subscribe(mosq, NULL, topic, 1))
-                {
-                        fprintf(stderr, "Unable to subscribe to topic '%s'!\n", topic);
-                        mosq = NULL;
-                        goto clean;
+                        fprintf(stderr, "Unable to subscribe to topic!\n");
+                        return -1;
                 }
         }
+        return 0;
+}
 
-        fprintf(stdout, "Connected to '%s:%d' with topic '%s'\n", remote_addr, cPort, topic);
+int connectToBroker(struct mosquitto **mosq)
+{
+        int rc = 0;
+        int port = 0;
+        topic *allTopics = NULL;
+        broker mqttBroker;
 
+        if ((getBroker(&mqttBroker)) == -1)
+        {
+                fprintf(stderr, "Unable to get broker settings!");
+                rc = -1;
+                goto clean;
+        }
+        if (getTopics("mqtt_topics", &allTopics) == -1)
+        {
+                fprintf(stderr, "Unable to get topics for subscription!");
+                rc = -1;
+                goto clean;
+        }
+
+        if ((*mosq = mosquitto_new(NULL, true, NULL)) == NULL)
+        {
+                fprintf(stderr, "Unable to initialize instance of broker!\n");
+                rc = -1;
+                goto clean;
+        }
+
+        port = (int)strtol(mqttBroker.remote_port, (char **)NULL, 10);
+        mosquitto_connect_callback_set(*mosq, connect_cb);
+        mosquitto_message_callback_set(*mosq, message_cb);
+        mosquitto_subscribe_callback_set(*mosq, subscribe_cb);
+        if (mqttBroker.userName[0] != 0 && mqttBroker.password[0] != 0)
+        {
+                if (mosquitto_username_pw_set(*mosq, mqttBroker.userName, mqttBroker.password))
+                {
+                        fprintf(stderr, "Can't set username and password!\n");
+                        rc = -1;
+                        goto clean;
+                }
+        }
+        if (mosquitto_connect(*mosq, mqttBroker.remote_addr, port, 60))
+        {
+                fprintf(stderr, "Can't connect to Mosquitto broker!\n");
+                rc = -1;
+                goto clean;
+        }
+        if (topicsSubscription(&mosq, allTopics) != 0)
+        {
+                rc = -1;
+                goto clean;
+        }
         clean:
-                free(remote_addr);
-                free(remote_port);
-                free(topic);
-        return mosq;
+                free(allTopics);
+        return rc;
 }
 
 int main(int argc, char *argv[])
@@ -153,23 +251,25 @@ int main(int argc, char *argv[])
         action.sa_handler = term_proc;
         sigaction(SIGTERM, &action, NULL);
 
-        fp = fopen("/tmp/mqttMessages", "w+");
-        fclose(fp);
-
         mosquitto_lib_init();
 
-        if (!(mosq = connectToBroker()))
+        if (connectToBroker(&mosq) != 0)
         {
                 goto clean;
         }
 
         while (deamonize)
         {
-                mosquitto_loop(mosq, -1, 1);
+                if (mosquitto_loop(mosq, -1, 1) != MOSQ_ERR_SUCCESS)
+                {
+                        fprintf(stderr, "Lost connection to Mosquitto broker!\n");
+                        goto clean;
+                }
         }
 
-clean:
-        mosquitto_destroy(mosq);
-        mosquitto_lib_cleanup();
+        clean:
+                mosquitto_destroy(mosq);
+                mosquitto_lib_cleanup();
         return 0;
 }
+

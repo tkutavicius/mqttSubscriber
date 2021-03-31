@@ -1,4 +1,4 @@
-local m, s, s1, s2, s3
+local m, s
 local certs = require "luci.model.certificate"
 local fs = require "nixio.fs"
 require("luci.config")
@@ -161,68 +161,6 @@ o:depends({tls = "1", tls_type = "psk"})
 o = s:option(Value, "identity", translate("Identity"), translate("Specify the Identity"))
 o.datatype = "uciname"
 o.placeholder = "Identity"
-o:depends({tls = "1", tls_type = "psk"})
+o:depends({tls = "1", tls_type = "psk"})        
 
-m1 = Map("mqtt_topics")
-s1 = m1:section(TypedSection, "mqtt_topic", translate("MQTT Topics"))                                        
-s1.template  = "cbi/tblsection"                                                                           
-s1.addremove = true                                                                                       
-s1.anonymous = true   
-s1.template_addremove = "cbi/general_addremove"
-s1.novaluetext = translate("There are no MQTT topics created yet") 
-s1.delete_alert = true                                                                                 
-s1.alert_message = translate("Are you sure you want to delete this topic?")                                     
-s1.add_title = translate("Add new topic")                                                                
-s1.value_title = translate("Name")
-s1.value_description = translate("Name of new topic") 
-s1.list_title = translate("QoS")    
-s1.list_description = translate("QoS of new topic")  
-s1.addlist = {                                                                                                                                 
-	0,
-	1,
-	2                                                                                                         
-}                                                                   
-s1.create = function (self, section)
-	local stat, exists
-	local value = self.map:formvalue("cbi.cts." .. self.config .. "." .. self.sectiontype .. ".name")
-	local qos = self.map:formvalue("cbi." .. self.config .. "." .. self.sectiontype .. ".select")
-	local add = self.map:formvalue("cbi.cts." .. self.config .. "." .. self.sectiontype .. ".add")   
-                                                                                                         
-if value and #value > 0 then                                                                 
-	self.map.uci:foreach(self.config, self.sectiontype, function(s)                          
-		if s.topicName and s.topicName == value then                                               
-			exists = true                                                            
-			return false                                                             
-		end                                                                              
-	end)                                                                                     																							 
-	if exists then                                                                        
-		self.map:error_msg(translatef("Topic '%s' already exists", value))
-		return false                                                                   
-	end                                                                                    
-	stat = AbstractSection.create(self, section)                                           																					   
-	if stat then                                                                           
-		self.map:set(stat, "topicName", value)
-		self.map:set(stat, "qos", qos-1)                                             
-	end                                                                                    
-	elseif add and (not value or #value == 0) then                                                 
-		m:error_msg(translate("No topic name provided"))                                     
-		return nil                                                                             
-	end                                                                                            																							   
-	return stat                                               
-end 
-s1:option(DummyValue, "topicName", translate("Topic name"), translate("Name of MQTT Topic"))
-s1:option(DummyValue, "qos", translate("QoS"), translate("QoS of MQTT Topic"))          
-
-s2 = m:section(NamedSection, "mqtt_sub", "mqtt_sub",  translate("MQTT Messages"), translate(""))
-o = s2:option(TextValue, "script")
-o.readonly = true
-
-function o.cfgvalue()
-	return fs.readfile("/tmp/mqttMessages")
-end
-
-s3 = m:section(SimpleSection, "", translate(""))                                                                  
-button = s3:option(DummyValue, "refresh")                     
-button.template = "/mqtt/refreshbutton" 
-
-return m,m1
+return m

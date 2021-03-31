@@ -1,0 +1,129 @@
+<h3 class="content-title note-after <%=(self.instance_description and #self.instance_description > 0) and 'hoverable' or ''%>" 
+	onclick="toggleContent(this, '<%=self.config%>.<%=self.sectiontype%>.<%=self.newdevice%>toggle_add')">
+	<div class="toggle-arrow expanded"><img src="<%=media%>/img/icons/arrow-toggle.svg"></div>
+	<%- if self.add_title then -%>
+		<span><%=self.add_title%>
+			<% if self.instance_description and #self.instance_description > 0 then %>
+				<div class="label-info"><%=self.instance_description%></div>
+			<% end -%>
+		</span>
+	<% elseif not self.dont_show_add then %>
+		<span><%:Add new instance%>
+			<% if self.instance_description and #self.instance_description > 0 then %>
+				<div class="label-info"><%=self.instance_description%></div>
+			<% end -%>
+		</span>
+	<% end -%>
+</h3>
+	<div id="<%=self.config%>.<%=self.sectiontype%>.<%=self.newdevice%>toggle_add" class="table-wrapper table-addremove toggle-content">
+<table>
+	<%- if not self.anonymous or self.value_title or self.list_title then -%>
+		<thead>
+			<tr>
+			<%- if self.value_title then -%>
+				<th class="<%=self.value_description and #self.value_description > 0 and 'hoverable'%>">
+					<%=self.value_title%>
+					<%- if self.value_description then -%>
+						<div class="inline-input info">
+							<div class="inline-input-text">
+								<%=self.value_description%>
+							</div>
+						</div>
+					<%- end -%>
+				</th>
+			<%- end -%>
+			<%- if self.list_title then -%>
+			<th class="<%=self.list_description and #self.list_description > 0 and 'hoverable'%>" style="text-align:left;">
+				<%=self.list_title%>
+				<%- if self.list_description then -%>
+					<div class="inline-input info">
+						<div class="inline-input-text">
+							<%=self.list_description%>
+						</div>
+					</div>
+				<%- end -%>
+			</th>
+			<%- end -%>
+			<th></th>
+		</tr>
+		</thead>
+	<%- end -%>
+	<tbody>
+	<tr>
+		<%- if self.value_title then -%>
+			<td class="input-cell">
+				<div class="div-heading"><%=self.value_title%></div>
+				<input type="text" id="cbi.cts.<%=self.config%>.<%=self.sectiontype%>.name"
+					name="cbi.cts.<%=self.config%>.<%=self.sectiontype%>.name"
+					data-type="<%=self.selected_datatype or 'nospace'%>" data-optional="true" maxlength="<%=self.maxlength or 16%>"/>
+				<% if self.invalid_cts then -%>
+				<div class="inline-input warning">
+					<img src="<%=media%>/img/icons/warning.svg">
+					<div class="inline-input-text">
+						<% if self.message_cts then %>
+						<%=self.message_cts%>
+						<% else %>
+						<%:Invalid%>
+						<% end %>
+					</div>
+				</div>
+				<%- end %>
+			</td>
+		<%- end %>
+		<%- if self.list_title then -%>
+			<td  style="text-align:left; min-width: 300px;">
+				<div class="div-heading"><%=self.list_title%></div>
+				<select class="cbi-input-select" name="cbi.<%=self.config%>.<%=self.sectiontype%>.select">
+					<% if self.addlist then
+							for k,v in pairs(self.addlist) do %>
+								<option value="<%=k%>"><%=v%></option>
+							<% end %>
+						<% else %>
+							<option value="-">No selection</option>
+						<% end %>
+				</select>
+				<% if self.invalid_cts then -%>
+				<div class="inline-input warning">
+					<img src="<%=media%>/img/icons/warning.svg">
+					<div class="inline-input-text">
+						<% if self.message_cts then %>
+						<%=self.message_cts%>
+						<% else %>
+						<%:Invalid%>
+						<% end %>
+					</div>
+				</div>
+				<%- end %>
+			</td>
+		<%- end %>
+		<%- if self.anonymous then -%>
+			<td>
+				<input type="submit" value="<%:Add%>" title="<%:Add%>" class="btn"
+					   name="cbi.cts.<%=self.config%>.<%=self.sectiontype%>.add"
+					   maxlength="8"/>
+			</td>
+		<%- else -%>
+			<td>
+				<input type="submit" title="<%:Add%>" class="btn"
+					   onclick="if(validate_input_field('<%=self.config%>', '<%=self.sectiontype%>')) {this.form.cbi_state='add-section'; return true} else {return false}" value="<%:Add%>"/>
+			</td>
+		<%- end -%>
+	</tr>
+	</tbody>
+</table>
+</div>
+<script type="text/javascript">
+function validate_input_field(config, section) {
+	var input = document.getElementById("cbi.cts." + config + "." + section + ".name");
+	if (input.value.length === 0) {
+		if (!input.className.match(/cbi-input-invalid/)) {
+			input.className += ' cbi-input-invalid';
+		}
+		return false;
+	} else {
+		return true;
+	}
+}
+checkToggled(document.getElementById("<%=self.config%>.<%=self.sectiontype%>.<%=self.newdevice%>toggle_add"),
+	'<%=self.config%>.<%=self.sectiontype%>.<%=self.newdevice%>toggle_add');
+</script>

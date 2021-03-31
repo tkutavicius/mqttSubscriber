@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <malloc.h>
+#include <sqlite3.h>
 
 typedef struct topic
 {
@@ -28,6 +29,61 @@ void term_proc(int sigterm)
         deamonize = 0;
 }
 
+int saveMessage(char *topic, char* payload)
+{
+        int rc = 0;
+        sqlite3 *db;
+        char *err_msg = 0;
+        time_t now;
+        time(&now);
+        struct tm *local = localtime(&now);
+        char sql[150];
+        
+        int day = local->tm_mday;
+        int month = local->tm_mon + 1;
+        int year = local->tm_year + 1900;
+        int hours = local->tm_hour;
+        int minutes = local->tm_min;
+        int seconds = local->tm_sec;
+    
+        rc = sqlite3_open("/etc/mosquitto/messages.db", &db);
+
+        if (rc != SQLITE_OK) 
+        {
+                fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
+                goto clean;
+        }
+
+        sprintf(sql,"INSERT INTO MESSAGE (topic, payload, timestamp) VALUES ('%s', '%s', '%d-%02d-%02d %02d:%02d:%02d');\n"
+                ,topic, payload, year, month, day, hours, minutes, seconds);
+
+        rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
+    
+        if (rc != SQLITE_OK) 
+        {
+                fprintf(stderr, "SQL error: %s\n", err_msg);
+                goto clean;
+        }
+
+        clean:
+                sqlite3_free(err_msg);        
+                sqlite3_close(db);
+
+        return rc;
+
+}
+
+static void message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
+{
+        if (message->payloadlen)
+        {
+                if (saveMessage(message->topic, message->payload) != 0)
+                {
+                        fprintf(stderr, "The incoming message was not saved!\n");
+                }
+        }
+}
+
 static void connect_cb(struct mosquitto *mosq, void *userdata, int rc)
 {
         if (rc)
@@ -39,30 +95,6 @@ static void connect_cb(struct mosquitto *mosq, void *userdata, int rc)
 void subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos)
 {
         fprintf(stdout, "Subscription successful! QoS: %d\n", granted_qos[0]);
-}
-
-static void message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
-{
-        FILE *fp;
-        time_t now;
-        time(&now);
-
-        struct tm *local = localtime(&now);
-
-        int day = local->tm_mday;
-        int month = local->tm_mon + 1;
-        int year = local->tm_year + 1900;
-        int hours = local->tm_hour;
-        int minutes = local->tm_min;
-        int seconds = local->tm_sec;
-
-        if (message->payloadlen)
-        {
-                fp = fopen("/tmp/mqttMessages", "a");
-                fprintf(fp, "[%d-%02d-%02d %02d:%02d:%02d] [%s] %s\n", year, month, day,
-                        hours, minutes, seconds, message->topic, message->payload);
-                fclose(fp);
-        }
 }
 
 struct uci_package *loadConfig(char *config_name)
@@ -195,13 +227,13 @@ int connectToBroker(struct mosquitto **mosq)
 
         if ((getBroker(&mqttBroker)) == -1)
         {
-                fprintf(stderr, "Unable to get broker settings!");
+                fprintf(stderr, "Unable to get broker settings!\n");
                 rc = -1;
                 goto clean;
         }
         if (getTopics("mqtt_topics", &allTopics) == -1)
         {
-                fprintf(stderr, "Unable to get topics for subscription!");
+                fprintf(stderr, "Unable to get topics for subscription!\n");
                 rc = -1;
                 goto clean;
         }
@@ -235,6 +267,7 @@ int connectToBroker(struct mosquitto **mosq)
         if (topicsSubscription(&mosq, allTopics) != 0)
         {
                 rc = -1;
+                fprintf(stderr, "Can't connect to Mosquitto broker!\n");
                 goto clean;
         }
         clean:
@@ -272,4 +305,3 @@ int main(int argc, char *argv[])
                 mosquitto_lib_cleanup();
         return 0;
 }
-

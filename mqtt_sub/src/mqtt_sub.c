@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <mosquitto.h>
 #include <signal.h>
 #include <time.h>
 #include <malloc.h>
@@ -14,7 +13,7 @@ void term_proc(int sigterm)
         deamonize = 0;
 }
 
-void message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
+static void message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message)
 {
         if (message->payloadlen)
         {
@@ -25,7 +24,7 @@ void message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_m
         }
 }
 
-void connect_cb(struct mosquitto *mosq, void *userdata, int rc)
+static void connect_cb(struct mosquitto *mosq, void *userdata, int rc)
 {
         if (rc)
         {
@@ -33,10 +32,15 @@ void connect_cb(struct mosquitto *mosq, void *userdata, int rc)
         }
 }
 
-void subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos)
+static void subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos)
 {
         fprintf(stdout, "Subscription successful! QoS: %d\n", granted_qos[0]);
 }
+
+/*static void log_cb(struct mosquitto *mosq, void *obj, int level, const char *str)
+{
+        fprintf(stdout, "level:%d,\n\tstr:%s\n", level, str);
+}*/
 
 int topicsSubscription(struct mosquitto ***mosq, struct topic *allTopics)
 {
@@ -52,48 +56,54 @@ int topicsSubscription(struct mosquitto ***mosq, struct topic *allTopics)
         return 0;
 }
 
-int saveMessage(char *topic, char* payload)
+char *formatDate()
 {
-        int rc = 0;
-        sqlite3 *db;
-        char *err_msg = 0;
         time_t now;
         time(&now);
         struct tm *local = localtime(&now);
-        char sql[150];
-        
+        static char timestamp[19];
+
         int day = local->tm_mday;
         int month = local->tm_mon + 1;
         int year = local->tm_year + 1900;
         int hours = local->tm_hour;
         int minutes = local->tm_min;
         int seconds = local->tm_sec;
-    
+
+        sprintf(timestamp, "%d-%02d-%02d %02d:%02d:%02d", year, month, day, hours, minutes, seconds);
+        return timestamp;
+}
+
+int saveMessage(char *topic, char *payload)
+{
+        int rc = 0;
+        sqlite3 *db;
+        char *err_msg = 0;
+        char sql[150];
+
         rc = sqlite3_open("/etc/mosquitto/messages.db", &db);
 
-        if (rc != SQLITE_OK) 
+        if (rc != SQLITE_OK)
         {
                 fprintf(stderr, "Cannot open database: %s\n", sqlite3_errmsg(db));
                 goto clean;
         }
 
-        sprintf(sql,"INSERT INTO MESSAGE (topic, payload, timestamp) VALUES ('%s', '%s', '%d-%02d-%02d %02d:%02d:%02d');\n"
-                ,topic, payload, year, month, day, hours, minutes, seconds);
+        sprintf(sql, "INSERT INTO MESSAGE (topic, payload, timestamp) VALUES ('%s', '%s', '%s');\n", topic, payload, formatDate());
 
         rc = sqlite3_exec(db, sql, 0, 0, &err_msg);
-    
-        if (rc != SQLITE_OK) 
+
+        if (rc != SQLITE_OK)
         {
                 fprintf(stderr, "SQL error: %s\n", err_msg);
                 goto clean;
         }
 
-        clean:
-                sqlite3_free(err_msg);        
-                sqlite3_close(db);
+clean:
+        sqlite3_free(err_msg);
+        sqlite3_close(db);
 
         return rc;
-
 }
 
 int connectToBroker(struct mosquitto **mosq)
@@ -102,6 +112,8 @@ int connectToBroker(struct mosquitto **mosq)
         int port = 0;
         topic *allTopics = NULL;
         broker mqttBroker;
+
+        mosquitto_lib_init();
 
         if ((getBroker(&mqttBroker)) == -1)
         {
@@ -127,11 +139,54 @@ int connectToBroker(struct mosquitto **mosq)
         mosquitto_connect_callback_set(*mosq, connect_cb);
         mosquitto_message_callback_set(*mosq, message_cb);
         mosquitto_subscribe_callback_set(*mosq, subscribe_cb);
+        //mosquitto_log_callback_set(*mosq, log_cb);
         if (mqttBroker.userName[0] != 0 && mqttBroker.password[0] != 0)
         {
                 if (mosquitto_username_pw_set(*mosq, mqttBroker.userName, mqttBroker.password))
                 {
                         fprintf(stderr, "Can't set username and password!\n");
+                        rc = -1;
+                        goto clean;
+                }
+        }
+        if (mqttBroker.useTls)
+        {
+                if (strcmp(mqttBroker.tlsType, "cert") == 0)
+                {
+                        if (mosquitto_tls_set(*mosq, mqttBroker.caCert, NULL, mqttBroker.clientCert, mqttBroker.clientKey, NULL))
+                        {
+                                fprintf(stderr, "Can't set TLS/SSL certificate!\n");
+                                rc = -1;
+                                goto clean;
+                        }
+                        if (mqttBroker.insecureTls)
+                        {
+                                if (mosquitto_tls_insecure_set(*mosq, true))
+                                {
+                                        fprintf(stderr, "Can't set TLS/SSL insecure option!\n");
+                                        rc = -1;
+                                        goto clean;
+                                }
+                        }
+                }
+                else if (strcmp(mqttBroker.tlsType, "psk") == 0)
+                {
+                        if (mosquitto_tls_psk_set(*mosq, mqttBroker.psk, mqttBroker.pskIdentity, NULL))
+                        {
+                                fprintf(stderr, "Can't set TLS/SSL PSK!\n");
+                                rc = -1;
+                                goto clean;
+                        }
+                }
+                else
+                {
+                        fprintf(stderr, "Unable to set TLS/SSL!\n");
+                        rc = -1;
+                        goto clean;
+                }
+                if (mosquitto_tls_opts_set(*mosq, 1, NULL, NULL))
+                {
+                        fprintf(stderr, "Can't set TLS/SSL options!\n");
                         rc = -1;
                         goto clean;
                 }
@@ -148,8 +203,8 @@ int connectToBroker(struct mosquitto **mosq)
                 fprintf(stderr, "Can't connect to Mosquitto broker!\n");
                 goto clean;
         }
-        clean:
-                free(allTopics);
+clean:
+        free(allTopics);
         return rc;
 }
 
@@ -177,8 +232,8 @@ int main(int argc, char *argv[])
                 }
         }
 
-        clean:
-                mosquitto_destroy(mosq);
-                mosquitto_lib_cleanup();
+clean:
+        mosquitto_destroy(mosq);
+        mosquitto_lib_cleanup();
         return 0;
 }

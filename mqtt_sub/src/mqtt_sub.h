@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <mosquitto.h> 
+#include <stdbool.h>
   
 typedef struct topic
 {
@@ -16,13 +18,18 @@ typedef struct broker
         char remote_port[6];
         char userName[20];
         char password[20];
+        bool useTls;
+        bool insecureTls;
+        char tlsType[5];
+        char pskIdentity[50];
+        char psk[256];
+        char clientCert[50];
+        char clientKey[50];
+        char caCert[50];
 } broker;
 
 void term_proc(int sigterm);
 int saveMessage(char *topic, char* payload);
-static void message_cb(struct mosquitto *mosq, void *userdata, const struct mosquitto_message *message);
-static void connect_cb(struct mosquitto *mosq, void *userdata, int rc);
-static void subscribe_cb(struct mosquitto *mosq, void *userdata, int mid, int qos_count, const int *granted_qos);
 int topicsSubscription(struct mosquitto ***mosq, struct topic *allTopics);
 int connectToBroker(struct mosquitto **mosq);
   

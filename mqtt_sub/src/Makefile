@@ -1,5 +1,5 @@
 BIN:=mqtt_sub
-CFLAGS:=-lmosquitto -luci -lsqlite3
+CFLAGS:=-lmosquitto -luci -lsqlite3 -g -Wall
 SOURCE=mqtt_sub.c mqtt_config.c
 OBJECTS=$(SOURCE:.c=.o)
 
@@ -11,4 +11,4 @@ $(BIN): $(OBJECTS)
 	$(CC) -o $@ $^ $(CFLAGS)
 
 clean:
-	rm -fr *o $(BIN)
+	rm -fr $(OBJECTS) $(BIN)

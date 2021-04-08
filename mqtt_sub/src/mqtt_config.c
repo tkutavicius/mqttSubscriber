@@ -84,7 +84,9 @@ static int getOption(char *path, char *option)
 
 int getBroker(struct broker *mqttBroker)
 {
-        char entry[30];
+        char entry[40];
+        char tls[1];
+        char insecure[1];
         strcpy(entry, "mqtt_sub.mqtt_sub.remote_addr");
         if (getOption(entry, mqttBroker->remote_addr) != 0)
         {
@@ -104,6 +106,67 @@ int getBroker(struct broker *mqttBroker)
         if (getOption(entry, mqttBroker->password) != 0)
         {
                 mqttBroker->password[0] = 0;
+        }
+        strcpy(entry, "mqtt_sub.mqtt_sub.tls");
+        if (getOption(entry, tls) != 0)
+        {
+                mqttBroker->useTls = false;
+        }
+        else
+        {
+                mqttBroker->useTls = true;
+        }
+        if (mqttBroker->useTls)
+        {
+                strcpy(entry, "mqtt_sub.mqtt_sub.tls_type");
+                if (getOption(entry, mqttBroker->tlsType) != 0)
+                {
+                        return -1;
+                }
+                if (strcmp(mqttBroker->tlsType, "cert") == 0)
+                {
+                        strcpy(entry, "mqtt_sub.mqtt_sub.certfile");
+                        if (getOption(entry, mqttBroker->clientCert) != 0)
+                        {
+                                return -1;
+                        }
+                        strcpy(entry, "mqtt_sub.mqtt_sub.cafile");
+                        if (getOption(entry, mqttBroker->caCert) != 0)
+                        {
+                                return -1;
+                        }
+                        strcpy(entry, "mqtt_sub.mqtt_sub.keyfile");
+                        if (getOption(entry, mqttBroker->clientKey) != 0)
+                        {
+                                return -1;
+                        }
+                        strcpy(entry, "mqtt_sub.mqtt_sub.tls_insecure");
+                        if (getOption(entry, insecure) != 0)
+                        {
+                                mqttBroker->insecureTls = false;
+                        }
+                        else
+                        {
+                                mqttBroker->insecureTls = true;
+                        }
+                }
+                else if (strcmp(mqttBroker->tlsType, "psk") == 0)
+                {
+                        strcpy(entry, "mqtt_sub.mqtt_sub.identity");
+                        if (getOption(entry, mqttBroker->pskIdentity) != 0)
+                        {
+                                return -1;
+                        }
+                        strcpy(entry, "mqtt_sub.mqtt_sub.psk");
+                        if (getOption(entry, mqttBroker->psk) != 0)
+                        {
+                                return -1;
+                        }
+                }
+                else
+                {
+                        return -1;
+                }
         }
         return 0;
 }

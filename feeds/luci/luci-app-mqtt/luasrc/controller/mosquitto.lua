@@ -8,5 +8,5 @@ function index()
   entry( { "admin", "services", "mqtt", "subscriber", "settings" }, cbi("mqtt_sub"), _("Broker Settings"), 4).dependent=false
   entry( { "admin", "services", "mqtt", "subscriber", "topics" }, cbi("mqtt_topics"), _("Subscription Topics"), 5).dependent=false
   entry( { "admin", "services", "mqtt", "subscriber", "messages" }, form("mqtt_messages"), _("Messages"), 6).dependent=false
-  entry( { "admin", "services", "mqtt", "subscriber", "events" }, arcombine(cbi("mqtt_events_overview"), cbi("mqtt_event")),_("Events"), 7).leaf = true
+  entry( { "admin", "services", "mqtt", "subscriber", "events" }, arcombine(cbi("mqtt_events_overview"), cbi("mqtt_event")), _("Events"), 7).leaf = true
 end

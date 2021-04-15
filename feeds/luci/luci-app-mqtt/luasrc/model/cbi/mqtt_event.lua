@@ -29,12 +29,12 @@ o1.rmempty = false
 
 o2 = s:option(ListValue, "decimalComparator", translate("Comparator"))
 o2:depends("attributeType","Decimal")
-o2:value(">", ">")
-o2:value("<", "<")
-o2:value(">=", ">=")
-o2:value("<=", "<=")
-o2:value("==", "==")
-o2:value("!=", "!=")
+o2:value("0", ">")
+o2:value("1", "<")
+o2:value("2", ">=")
+o2:value("3", "<=")
+o2:value("4", "==")
+o2:value("5", "!=")
 
 o3 = s:option(ListValue, "stringComparator", translate("Comparator"))
 o3:depends("attributeType","String")

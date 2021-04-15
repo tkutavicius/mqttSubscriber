@@ -5,15 +5,27 @@
 #include <string.h>
 #include <mosquitto.h> 
 #include <stdbool.h>
+#include <stdio.h>
+#include <malloc.h>
+#include <signal.h>
+
+typedef struct event {
+        char topicName[60];
+        char attributeType[10];
+        char attribute[128];
+        char decimalComparator[1];
+        char stringComparator[15];
+        char attributeValue[128];
+} event;
   
-typedef struct topic
-{
+typedef struct topic {
         char name[60];
         int QoS;
+        int eC;
+        event topicEvents[20];
 } topic;
 
-typedef struct broker
-{
+typedef struct broker {
         char remote_addr[256];
         char remote_port[6];
         char userName[20];
@@ -28,9 +40,6 @@ typedef struct broker
         char caCert[50];
 } broker;
 
-void term_proc(int sigterm);
-int saveMessage(char *topic, char* payload);
-int topicsSubscription(struct mosquitto ***mosq, struct topic *allTopics);
-int connectToBroker(struct mosquitto **mosq);
+extern int connectToBroker(struct mosquitto **mosq);
   
 #endif

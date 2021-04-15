@@ -1,14 +1,14 @@
 BIN:=mqtt_sub
-CFLAGS:=-lmosquitto -luci -lsqlite3 -g -Wall
-SOURCE=mqtt_sub.c mqtt_config.c
+LDFLAGS:=-lmosquitto -luci -lsqlite3 -ljson-c
+CFLAGS:=-g -Wall
+SOURCE:=$(wildcard *.c)
 OBJECTS=$(SOURCE:.c=.o)
-
 .PHONY: all clean
 
 all: $(BIN)
 
 $(BIN): $(OBJECTS)
-	$(CC) -o $@ $^ $(CFLAGS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LDFLAGS)
 
 clean:
 	rm -fr $(OBJECTS) $(BIN)

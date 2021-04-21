@@ -1,7 +1,5 @@
 local dsp = require "luci.dispatcher"
 local uci = require "luci.model.uci".cursor()
-
-local m, s, o
 local sid = arg[1]
 
 m = Map("mqtt_events")
@@ -43,6 +41,18 @@ o3:value("Not Equal To", "Not Equal To")
 
 o4 = s:option(Value, "attributeValue", translate("Attribute Value"))
 o4.rmempty = false
+
+o5 = s:option(Value, "recipientEmail", translate("Email address to be informed"))
+o5.rmempty = false
+o5.datatype = "email"
+o5.placeholder = translate("user@user.com")
+o5.maxlength = "128"
+
+lv1 = s:option(ListValue, "senderGroup", translate("Email group of sender"));
+m.uci:foreach("user_groups","email",
+    function(i)
+        lv1:value(i.name, i.name)
+    end)
 
 return m
 

@@ -9,10 +9,29 @@ s.extedit = dsp.build_url("admin", "services", "mqtt", "subscriber", "events", "
 s.novaluetext = translate("There are no MQTT events created yet") 
 s.delete_alert = true                                                                                 
 s.alert_message = translate("Are you sure you want to delete this event?")
-s:option(DummyValue, "topicName", translate("Topic name"), translate("Name of MQTT Topic"))
-s:option(DummyValue, "attributeType", translate("Attribute Type"), translate("Message attribute type"))
-s:option(DummyValue, "attribute", translate("Attribute"), translate("Message attribute"))
-s:option(DummyValue, "decimalComparator", translate("Decimal Comparator"), translate("If message attribute type is decimal, this shows comparator for decimal attribute"))
-s:option(DummyValue, "stringComparator", translate("String Comparator"), translate("If message attribute type is string, this shows comparator for string attribute"))
-s:option(DummyValue, "attributeValue", translate("Attribute Value"), translate("Message attribute value to compare"))
+topicName = s:option(DummyValue, "topicName", translate("Topic name"), translate("Name of MQTT Topic"))
+aT = s:option(DummyValue, "attributeType", translate("Attribute Type"), translate("Message attribute type"))
+a = s:option(DummyValue, "attribute", translate("Attribute"), translate("Message attribute"))
+dC = s:option(DummyValue, "decimalComparator", translate("Decimal Comparator"), translate("If message attribute type is decimal, this shows comparator for decimal attribute")) 
+function dC.cfgvalue(self, section)
+	local v = Value.cfgvalue(self, section)
+	if v == "0" then
+        return ">"
+    elseif v == "1" then
+        return "<"
+    elseif v == "2" then
+        return "<="
+    elseif v == "3" then
+        return "<="
+    elseif v == "4" then
+        return "=="
+    elseif v == "5" then
+        return "!="
+    else
+        return "-"
+    end
+end
+sC = s:option(DummyValue, "stringComparator", translate("String Comparator"), translate("If message attribute type is string, this shows comparator for string attribute"))
+aV = s:option(DummyValue, "attributeValue", translate("Attribute Value"), translate("Message attribute value to compare"))
+rE = s:option(DummyValue, "recipientEmail", translate("Email address to be informed"))
 return m;

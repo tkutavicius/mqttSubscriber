@@ -57,12 +57,57 @@ extern int getTopics(char *config_name, struct topic **allTopics)
         return c;
 }
 
+static int getSenderData(char *config_name, struct event *tmpEvent, char* group)
+{
+        struct uci_package *p = NULL;
+        struct uci_element *i, *j;
+        bool search = false;
+
+        if ((p = loadConfig(config_name)) == NULL) {
+                return -1;
+        }
+
+        uci_foreach_element(&p->sections, i) {
+                struct uci_section *section = uci_to_section(i);
+                uci_foreach_element(&section->options, j) {
+                        struct uci_option *option = uci_to_option(j);
+                        char *option_name = option->e.name;
+                        if (strcmp(option_name, "name") == 0 && strcmp(option->v.string, group) == 0)
+                        {
+                                search = true;
+                        }
+                        if (search) {
+                                if (strcmp(option_name, "smtp_ip") == 0) {
+                                        strcpy(tmpEvent->smtpIP, option->v.string);
+                                }
+                                else if (strcmp(option_name, "smtp_port") == 0) {
+                                        strcpy(tmpEvent->smtpPort, option->v.string);
+                                }
+                                else if (strcmp(option_name, "senderemail") == 0) {
+                                        strcpy(tmpEvent->senderEmail, option->v.string);
+                                }
+                                else if (strcmp(option_name, "username") == 0) {
+                                        strcpy(tmpEvent->userName, option->v.string);
+                                }
+                                else if (strcmp(option_name, "password") == 0) {
+                                        strcpy(tmpEvent->password, option->v.string);
+                                }
+                                else if (strcmp(option_name, "secure_conn") == 0) {
+                                        strcpy(tmpEvent->secure, option->v.string);
+                                } 
+                        }
+                }
+                search = false;
+        }
+        return 0;
+}
+
 extern int getEvents(char *config_name, struct topic **allTopics, int tC)
 {
         struct uci_package *p = NULL;
         struct uci_element *i, *j;
-        event empty = {0};
-        event tmpEvent = empty;
+        struct event empty = {0};
+        struct event tmpEvent = empty;
 
         if ((p = loadConfig(config_name)) == NULL) {
                 return -1;
@@ -90,6 +135,12 @@ extern int getEvents(char *config_name, struct topic **allTopics, int tC)
                         }
                         else if (strcmp(option_name, "attributeValue") == 0) {
                                 strcpy(tmpEvent.attributeValue, option->v.string);
+                        }
+                        else if (strcmp(option_name, "recipientEmail") == 0) {
+                                strcpy(tmpEvent.recipientEmail, option->v.string);
+                        }
+                        else if (strcmp(option_name, "senderGroup") == 0) {
+                                getSenderData("user_groups", &tmpEvent, option->v.string);
                         }
                 }
                 for (int i = 0; i < tC; i++) {

@@ -1,5 +1,6 @@
 #include <json-c/json.h>
 #include "mqtt_sub.h"
+#include "mqtt_mail.h"
 
 #define lt 0
 #define gt 1
@@ -67,11 +68,11 @@ static int processDecimalValue(struct event topicEvent, char *value)
         return rc;
 }
 
-static int sendMail()
+/*static int sendMail()
 {
         printf("Siunciamas message\n");
         return 0;
-}
+}*/
 
 static int checkValues(struct event topicEvent, char *value)
 {
@@ -132,13 +133,12 @@ extern int handleEvents(struct event *topicEvents, int eC, char *payload)
                         
                         value = getJSONValue(val);
                         
-                        if (strcmp(value, "") != 0) {
-                                if (checkValues(topicEvents[i], value) == 1) {
-                                        sendMail();
-                                }
+                        if (strcmp(value, "") == 0) {
+                                continue;
                         }
-                        else {
-                                return -1;
+                        
+                        if (checkValues(topicEvents[i], value) == 1) {
+                                sendMail(topicEvents[i], value);
                         }
                         free(value);
                 }

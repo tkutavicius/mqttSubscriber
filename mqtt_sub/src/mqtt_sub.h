@@ -10,12 +10,19 @@
 #include <signal.h>
 
 typedef struct event {
-        char topicName[60];
+        char topicName[64];
         char attributeType[10];
         char attribute[128];
         char decimalComparator[1];
         char stringComparator[15];
         char attributeValue[128];
+        char recipientEmail[128];
+        char smtpIP[128];
+        char smtpPort[6];
+        char userName[128];
+        char password[64];
+        char senderEmail[128];
+        char secure[1];
 } event;
   
 typedef struct topic {

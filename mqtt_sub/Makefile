@@ -10,7 +10,7 @@ define Package/mqtt_sub
 	SECTION:=net
 	CATEGORY:=Network
 	TITLE:=MQTT Subcriber
-	DEPENDS:=+libmosquitto +libuci +libsqlite3
+	DEPENDS:=+libmosquitto +libuci +libsqlite3 +libjson-c +libcurl
 endef
 
 define Package/mqtt_sub/description
